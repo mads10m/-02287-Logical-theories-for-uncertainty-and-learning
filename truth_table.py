@@ -184,6 +184,102 @@ def truth_table(expr: str):
         print("Result: UNSATISFIABLE (contradiction).")
 
 
+# ---------------- Entailment Check ----------------
+
+def check_entailment(lhs_str, rhs_str):
+    # Split lhs by comma to support multiple premises
+    if lhs_str.strip():
+        premise_strs = [s.strip() for s in lhs_str.split(',')]
+    else:
+        premise_strs = []
+    
+    conclusion_str = rhs_str.strip()
+    
+    # Parse all formulas
+    premises_rpn = []
+    all_vars = set()
+    
+    try:
+        for p_str in premise_strs:
+            tokens = tokenize(p_str)
+            rpn = to_rpn(tokens)
+            premises_rpn.append(rpn)
+            # Extract vars
+            vars_ = {t for t in tokens if t not in PRECEDENCE and t not in ('(', ')')}
+            all_vars.update(vars_)
+            
+        # Parse conclusion
+        tokens_c = tokenize(conclusion_str)
+        rpn_c = to_rpn(tokens_c)
+        vars_c = {t for t in tokens_c if t not in PRECEDENCE and t not in ('(', ')')}
+        all_vars.update(vars_c)
+    except Exception as e:
+        print(f"Error parsing formulas: {e}")
+        return
+
+    sorted_vars = sorted(all_vars)
+    
+    print(f"Checking entailment: {{{', '.join(premise_strs)}}} |= {conclusion_str}")
+    print(f"Variables: {', '.join(sorted_vars)}")
+    print()
+    
+    # Header
+    header_vars = " ".join(sorted_vars)
+    # We'll show a simplified table: Vars | Premises | Conclusion | Valid?
+    header = f"{header_vars} | Premises | Conclusion | Valid?"
+    print(header)
+    print("-" * len(header))
+    
+    is_valid = True
+    counterexamples = []
+    
+    for values in product([False, True], repeat=len(sorted_vars)):
+        valuation = dict(zip(sorted_vars, values))
+        
+        try:
+            # Eval premises
+            premise_vals = [eval_rpn(rpn, valuation) for rpn in premises_rpn]
+            all_premises_true = all(premise_vals)
+            
+            # Eval conclusion
+            conclusion_val = eval_rpn(rpn_c, valuation)
+        except Exception as e:
+            print(f"Error evaluating for valuation {valuation}: {e}")
+            return
+
+        # Check entailment
+        # If premises are true, conclusion must be true.
+        row_valid = True
+        if all_premises_true and not conclusion_val:
+            row_valid = False
+            is_valid = False
+            counterexamples.append(valuation)
+        
+        # Output row
+        vals_str = " ".join('1' if valuation[v] else '0' for v in sorted_vars)
+        prem_str = "1" if all_premises_true else "0"
+        conc_str = "1" if conclusion_val else "0"
+        status = "OK" if row_valid else "FAIL"
+        
+        # Formatting alignment
+        # Vars section width is len(header_vars)
+        # Premises column is 8 chars wide in header "Premises"
+        # Conclusion column is 10 chars wide "Conclusion"
+        # Valid? is 6 chars
+        
+        # Let's just use simple tabbing or fixed width
+        print(f"{vals_str} | {prem_str:^8} | {conc_str:^10} | {status}")
+
+    print()
+    if is_valid:
+        print("Result: Entailment HOLDS.")
+    else:
+        print("Result: Entailment DOES NOT HOLD.")
+        # print("Counterexamples (Premises=True, Conclusion=False):")
+        # for ce in counterexamples:
+        #     print(ce)
+
+
 # ---------------- Main ----------------
 
 if __name__ == "__main__":
@@ -191,5 +287,10 @@ if __name__ == "__main__":
     if len(sys.argv) >= 2:
         expr = " ".join(sys.argv[1:])
     else:
-        expr = input("Enter a propositional formula: ")
-    truth_table(expr)
+        expr = input("Enter a propositional formula (or entailment A |= B): ")
+
+    if '|=' in expr:
+        lhs, rhs = expr.split('|=', 1)
+        check_entailment(lhs, rhs)
+    else:
+        truth_table(expr)
