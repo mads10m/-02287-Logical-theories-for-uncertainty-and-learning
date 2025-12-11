@@ -55,7 +55,14 @@ def tokenize(s: str):
             j = i
             while j < len(s) and (s[j].isalnum() or s[j] == '_'):
                 j += 1
-            tokens.append(s[i:j])
+            token = s[i:j]
+            # Check for constants
+            if token.lower() in ('true', 't', '1'):
+                tokens.append('TRUE')
+            elif token.lower() in ('false', 'f', '0'):
+                tokens.append('FALSE')
+            else:
+                tokens.append(token)
             i = j
             continue
 
@@ -126,8 +133,13 @@ def eval_rpn(rpn, valuation):
                 elif tok == 'IFF':
                     stack.append(a == b)
         else:
-            # variable
-            stack.append(valuation[tok])
+            # variable or constant
+            if tok == 'TRUE':
+                stack.append(True)
+            elif tok == 'FALSE':
+                stack.append(False)
+            else:
+                stack.append(valuation[tok])
 
     if len(stack) != 1:
         raise ValueError("Invalid formula (stack not singleton at end)")
@@ -140,9 +152,9 @@ def truth_table(expr: str):
     tokens = tokenize(expr)
     rpn = to_rpn(tokens)
 
-    # Propositional variables = tokens that are not operators or parentheses
+    # Propositional variables = tokens that are not operators or parentheses or constants
     vars_ = sorted(
-        {t for t in tokens if t not in PRECEDENCE and t not in ('(', ')')}
+        {t for t in tokens if t not in PRECEDENCE and t not in ('(', ')', 'TRUE', 'FALSE')}
     )
 
     # Convert to "normal math" (Unicode) expression
@@ -205,14 +217,18 @@ def check_entailment(lhs_str, rhs_str):
             rpn = to_rpn(tokens)
             premises_rpn.append(rpn)
             # Extract vars
-            vars_ = {t for t in tokens if t not in PRECEDENCE and t not in ('(', ')')}
+            vars_ = {t for t in tokens if t not in PRECEDENCE and t not in ('(', ')', 'TRUE', 'FALSE')}
             all_vars.update(vars_)
             
         # Parse conclusion
-        tokens_c = tokenize(conclusion_str)
-        rpn_c = to_rpn(tokens_c)
-        vars_c = {t for t in tokens_c if t not in PRECEDENCE and t not in ('(', ')')}
-        all_vars.update(vars_c)
+        if conclusion_str:
+            tokens_c = tokenize(conclusion_str)
+            rpn_c = to_rpn(tokens_c)
+            vars_c = {t for t in tokens_c if t not in PRECEDENCE and t not in ('(', ')', 'TRUE', 'FALSE')}
+            all_vars.update(vars_c)
+        else:
+            # Empty conclusion means False (contradiction)
+            rpn_c = ['FALSE']
     except Exception as e:
         print(f"Error parsing formulas: {e}")
         return

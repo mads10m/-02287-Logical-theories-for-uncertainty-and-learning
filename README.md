@@ -40,3 +40,13 @@ uv run truth_table.py "(p -> q) & (q -> r) -> (p -> r)"
 - `|`: OR (`∨`)
 - `~` or `!`: NOT (`¬`)
 - `(` and `)`: Parentheses for grouping
+
+
+### Entailment Check
+- `false`, `f`, `0`: Contradiction (`⊥`)
+- `true`, `t`, `1`: Tautology (`⊤`)
+- `A |= B`: Check if formula A entails formula B
+
+```bash
+uv run truth_table.py "false |= B"
+```
