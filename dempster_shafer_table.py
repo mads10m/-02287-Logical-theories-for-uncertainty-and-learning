@@ -145,7 +145,7 @@ def solve_ds(domain, rows, tol=1e-9):
 # ---------- example: your table ----------
 
 if __name__ == "__main__":
-    # Domain {R, Y, G}
+    # Domain:
     domain = {"R", "Y", "G"}
 
     # Table rows: (subset, m(X), Bel_m(X), Plaus_m(X))
