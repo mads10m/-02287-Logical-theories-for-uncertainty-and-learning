@@ -50,3 +50,88 @@ uv run truth_table.py "(p -> q) & (q -> r) -> (p -> r)"
 ```bash
 uv run truth_table.py "false |= B"
 ```
+
+## Syntactic Proof Checker (Epistemic Logic)
+
+A tool for verifying syntactic proofs in the K_n axiom system (and S5).
+
+```bash
+uv run python syntactic_proof.py
+uv run python syntactic_proof_examples.py  # See all examples
+```
+
+### Axiom System
+
+| Axiom | Name | Schema |
+|-------|------|--------|
+| A1 | Tautology | All propositional tautologies |
+| A2 | Distribution/K | `K_i(φ → ψ) → (K_i φ → K_i ψ)` |
+| T  | Truth (S5) | `K_i φ → φ` |
+| 4  | Positive Introspection (S5) | `K_i φ → K_i K_i φ` |
+| 5  | Negative Introspection (S5) | `¬K_i φ → K_i ¬K_i φ` |
+
+(Last three axioms are only for S5, and not really needed for K_n)
+
+**Inference Rules:**
+- **MP** (Modus Ponens): From `φ` and `φ → ψ`, infer `ψ`
+- **Nec** (Necessitation): From `⊢ φ`, infer `⊢ K_i φ`
+
+**Premises:**
+- **Premise**: Any set of formulas assumed to be true without proof.
+
+For "start" of proof where no rule is specified, it is assumed to be a premise. Or if it is labeled "Premise".
+
+### Justification Labels
+
+| Label | Meaning |
+|-------|---------|
+| `A1`, `Taut` | Propositional tautology |
+| `A2`, `K`, `Dist` | Distribution axiom |
+| `T`, `Truth` | Truth axiom (S5) |
+| `4`, `PI` | Positive introspection (S5) |
+| `5`, `NI` | Negative introspection (S5) |
+| `MP`, `MP 1,2` | Modus ponens (optionally with line numbers) |
+| `Nec 1`, `N 1` | Necessitation from line 1 |
+| `Premise` | Given assumption |
+
+### Usage Example
+In ```syntactic_proof.py```, you can define a proof and check which of the multiple choice options is valid for a blank line.
+
+```python
+
+p, q = P("p"), P("q")
+
+# Define the proof with a blank line (formula = None)
+proof = [
+    ProofLine(1, K_(1, p >> q), "Premise"),
+    ProofLine(2, None, "A2"),  # BLANK LINE
+    ProofLine(3, K_(1, p) >> K_(1, q), "MP 1,2"),
+]
+
+# Define the multiple choice options
+choices = [
+    K_(1, p) >> K_(1, q),                              # A
+    K_(1, p >> q) >> (K_(1, p) >> K_(1, q)),           # B (correct)
+    K_(1, p >> q) >> K_(1, p),                         # C
+]
+
+# Find which answer is correct
+results = find_valid_answer(
+    proof,
+    blank_line_number=2,
+    choices=choices,
+    premises={K_(1, p >> q)},
+    axiom_system="K",  # or "S5" for S5 axioms, if not specified defaults to "K"
+)
+
+for i, (formula, valid, explanation) in enumerate(results, 1):
+    status = "✓ VALID" if valid else "✗ invalid"
+    print(f"{chr(64+i)}) {status} - {explanation}")
+```
+This will output:
+```
+A) ✗ invalid - Does not match K_i(φ→ψ) → (K_i φ → K_i ψ)
+B) ✓ VALID - Valid distribution axiom instance
+C) ✗ invalid - Does not match K_i(φ→ψ) → (K_i φ → K_i ψ)
+```
+File contains test exam example proof.
