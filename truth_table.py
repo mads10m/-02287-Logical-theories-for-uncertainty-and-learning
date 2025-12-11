@@ -27,6 +27,10 @@ def tokenize(s: str):
             tokens.append('IMP')
             i += 2
             continue
+        if s.startswith('XOR', i):
+            tokens.append('XOR')
+            i += 3
+            continue
 
         # Single-character operators
         if c in ['&', '∧', '^']:
@@ -35,6 +39,10 @@ def tokenize(s: str):
             continue
         if c in ['|', '∨']:
             tokens.append('OR')
+            i += 1
+            continue
+        if c in ['⊕']:
+            tokens.append('XOR')
             i += 1
             continue
         if c in ['!', '~', '¬']:
@@ -59,8 +67,9 @@ def tokenize(s: str):
 # ---------------- Parser: Shunting-yard to RPN ----------------
 
 PRECEDENCE = {
-    'NOT': 4,
-    'AND': 3,
+    'NOT': 5,
+    'AND': 4,
+    'XOR': 3,
     'OR':  2,
     'IMP': 1,
     'IFF': 0,
@@ -110,6 +119,8 @@ def eval_rpn(rpn, valuation):
                     stack.append(a and b)
                 elif tok == 'OR':
                     stack.append(a or b)
+                elif tok == 'XOR':
+                    stack.append(a != b)
                 elif tok == 'IMP':
                     stack.append((not a) or b)
                 elif tok == 'IFF':
@@ -141,6 +152,7 @@ def truth_table(expr: str):
         'NOT': '¬',
         'IMP': '→',
         'IFF': '↔',
+        'XOR': '⊕',
     }
     math_tokens = [math_map[t] if t in math_map else t for t in tokens]
     # Join with spaces, but maybe we can be smarter about spacing later.

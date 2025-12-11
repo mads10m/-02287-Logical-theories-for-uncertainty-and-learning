@@ -18,6 +18,12 @@ class Formula:
     def __rshift__(self, other): # phi >> psi  (phi -> psi)
         return Imp(self, other)
 
+    def __mod__(self, other):    # phi % psi (phi <-> psi)
+        return BiImp(self, other)
+
+    def __xor__(self, other):    # phi ^ psi (phi xor psi)
+        return Xor(self, other)
+
 
 @dataclass(frozen=True)
 class Prop(Formula):
@@ -63,6 +69,15 @@ class Imp(Formula):
 
 
 @dataclass(frozen=True)
+class BiImp(Formula):
+    left: Formula
+    right: Formula
+
+    def __str__(self):
+        return f"({self.left} ↔ {self.right})"
+
+
+@dataclass(frozen=True)
 class K(Formula):
     agent: int
     phi: Formula
@@ -96,6 +111,15 @@ class C(Formula):
 
     def __str__(self):
         return f"C_{set(self.group)} {self.phi}"
+
+
+@dataclass(frozen=True)
+class Xor(Formula):
+    left: Formula
+    right: Formula
+
+    def __str__(self):
+        return f"({self.left} ⊕ {self.right})"
 
 
 # Small helpers so formulas look nicer
@@ -169,6 +193,12 @@ def eval_formula(model: KripkeModel, w: str, phi: Formula) -> bool:
 
     if isinstance(phi, Imp):
         return (not eval_formula(model, w, phi.left)) or eval_formula(model, w, phi.right)
+
+    if isinstance(phi, BiImp):
+        return eval_formula(model, w, phi.left) == eval_formula(model, w, phi.right)
+
+    if isinstance(phi, Xor):
+        return eval_formula(model, w, phi.left) != eval_formula(model, w, phi.right)
 
     if isinstance(phi, K):
         # K_i phi: phi holds in all worlds accessible for agent i
@@ -273,8 +303,10 @@ if __name__ == "__main__":
     phi3 = K_(1, K_(2, p & q) | K_(2, ~(p & q)))
     phi4 = (p & ~p) >> q
     phi5 = C_({1,2}, p & q)
+    phi6 = p % q
+    phi7 = p ^ q
 
-    formulas = [phi1, phi2, phi3, phi4, phi5]
+    formulas = [phi1, phi2, phi3, phi4, phi5, phi6, phi7]
 
     for i, phi in enumerate(formulas, start=1):
         truth = truth_in_all_worlds(model, phi)
