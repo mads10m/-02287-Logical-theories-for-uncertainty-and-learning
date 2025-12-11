@@ -127,6 +127,28 @@ def P(name: str) -> Prop:
     return Prop(name)
 
 
+@dataclass(frozen=True)
+class PublicAnnouncement(Formula):
+    """Necessity-style public announcement: [!phi] psi."""
+
+    announcement: Formula
+    consequence: Formula
+
+    def __str__(self):
+        return f"[!{self.announcement}] {self.consequence}"
+
+
+@dataclass(frozen=True)
+class PossibleAnnouncement(Formula):
+    """Possibility-style public announcement: <!phi> psi."""
+
+    announcement: Formula
+    consequence: Formula
+
+    def __str__(self):
+        return f"<!{self.announcement}> {self.consequence}"
+
+
 def K_(agent: int, phi: Formula) -> K:
     return K(agent, phi)
 
@@ -173,6 +195,30 @@ class KripkeModel:
                 acc = sorted(list(rels[w]))
                 lines.append(f"      {w} -> {acc}")
         return "\n".join(lines)
+
+
+def restrict_model(model: KripkeModel, announcement: Formula) -> KripkeModel:
+    """Return the updated model M|phi after a public announcement phi.
+
+    Worlds where ``announcement`` is false are removed, and both the valuation
+    and accessibility relations are restricted accordingly.
+    """
+
+    remaining_worlds = {
+        world for world in model.worlds if eval_formula(model, world, announcement)
+    }
+
+    new_valuation = {w: model.valuation[w] for w in remaining_worlds}
+
+    new_relations: Dict[int, Dict[str, Set[str]]] = {}
+    for agent, rels in model.relations.items():
+        restricted_rels: Dict[str, Set[str]] = {}
+        for world in remaining_worlds:
+            accessible = rels.get(world, set())
+            restricted_rels[world] = {v for v in accessible if v in remaining_worlds}
+        new_relations[agent] = restricted_rels
+
+    return KripkeModel(remaining_worlds, new_valuation, new_relations)
 
 
 # ---------- Semantics ----------
@@ -250,6 +296,19 @@ def eval_formula(model: KripkeModel, w: str, phi: Formula) -> bool:
             intersection &= s
         return all(eval_formula(model, v, phi.phi) for v in intersection)
 
+    if isinstance(phi, PublicAnnouncement):
+        # [!φ] ψ is true if φ is false, or ψ holds after the public update
+        if not eval_formula(model, w, phi.announcement):
+            return True
+        updated_model = restrict_model(model, phi.announcement)
+        return eval_formula(updated_model, w, phi.consequence)
+
+    if isinstance(phi, PossibleAnnouncement):
+        # <!φ> ψ is the dual of [!φ] ψ
+        return eval_formula(model, w, phi.announcement) and eval_formula(
+            restrict_model(model, phi.announcement), w, phi.consequence
+        )
+
     raise TypeError(f"Unknown formula type: {type(phi)}")
 
 
@@ -305,8 +364,10 @@ if __name__ == "__main__":
     phi5 = C_({1,2}, p & q)
     phi6 = p % q
     phi7 = p ^ q
+    phi8 = PublicAnnouncement(p, K_(1, p))
+    phi9 = PossibleAnnouncement(q, K_(2, p))
 
-    formulas = [phi1, phi2, phi3, phi4, phi5, phi6, phi7]
+    formulas = [phi1, phi2, phi3, phi4, phi5, phi6, phi7, phi8, phi9]
 
     for i, phi in enumerate(formulas, start=1):
         truth = truth_in_all_worlds(model, phi)
@@ -315,4 +376,31 @@ if __name__ == "__main__":
         print(f"  formula: {phi}")
         print(f"  Truth worlds: {truth}")
         print(f"  Valid in model: {is_valid_in_model(model, phi)}")
+        print()
+
+    # Reduction axioms for public announcements
+    announcement = q  # the formula being announced in all checks below
+
+    ax_atomic_permanence = PublicAnnouncement(announcement, p) % (announcement >> p)
+    ax_ann_negation = PublicAnnouncement(announcement, ~p) % (announcement >> ~(PublicAnnouncement(announcement, p)))
+    ax_ann_conjunction = PublicAnnouncement(announcement, p & q) % (
+        PublicAnnouncement(announcement, p) & PublicAnnouncement(announcement, q)
+    )
+    ax_ann_knowledge = PublicAnnouncement(announcement, K_(1, p)) % (
+        announcement >> K_(1, PublicAnnouncement(announcement, p))
+    )
+
+    axiom_formulas = [
+        ("Atomic Permanence", ax_atomic_permanence),
+        ("Announcement-Negation", ax_ann_negation),
+        ("Announcement-Conjunction", ax_ann_conjunction),
+        ("Announcement-Knowledge", ax_ann_knowledge),
+    ]
+
+    for name, axiom in axiom_formulas:
+        print(f"Checking reduction axiom: {name}")
+        truth = truth_in_all_worlds(model, axiom)
+        print(f"  formula: {axiom}")
+        print(f"  Truth worlds: {truth}")
+        print(f"  Valid in model: {is_valid_in_model(model, axiom)}")
         print()
